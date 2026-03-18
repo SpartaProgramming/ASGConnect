@@ -1,8 +1,13 @@
 #include <Arduino.h>
+#include <Preferences.h>
 #include <RadioLib.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <XPowersLib.h>
+
+Preferences preferences;
+
+uint8_t noncesBuffer[RADIOLIB_LORAWAN_NONCES_BUF_SIZE];
 
 // --- KONFIGURACJA ZASILANIA (AXP2101) ---
 XPowersAXP2101 PMU;
@@ -66,9 +71,27 @@ void setup() {
   }
 
   // POPRAWKI SPRZĘTOWE DLA T-BEAM V1.2
-  radio.setTCXO(1.8);               // T-Beam używa kwarcu 3.3V (nie 1.8V!)
+  radio.setTCXO(3.3);               // T-Beam używa kwarcu 3.3V (nie 1.8V!)
   radio.setDio2AsRfSwitch(true);    // Automatyczny przełącznik anteny
   radio.setRxBoostedGainMode(true); // Wzmocnienie czułości odbiornika
+
+  // 1. Otwieramy przestrzeń w pamięci Flash pod nazwą "lorawan"
+  preferences.begin("lorawan", false);
+
+  // 2. Sprawdzamy, czy mamy już zapisane liczniki z poprzedniego uruchomienia
+  size_t len = preferences.getBytesLength("nonces");
+  if (len == RADIOLIB_LORAWAN_NONCES_BUF_SIZE) {
+    Serial.println("Wczytuję zapisane liczniki Nonce z pamięci Flash...");
+    preferences.getBytes("nonces", noncesBuffer,
+                         RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+  } else {
+    Serial.println("Brak zapisanych liczników, zaczynamy od zera.");
+    // Zerujemy bufor na wszelki wypadek
+    memset(noncesBuffer, 0, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+  }
+
+  // 3. Mówimy bibliotece RadioLib: "Hej, używaj tego bufora do liczników!"
+  node.setBufferNonces(noncesBuffer);
 
   // 4. DOŁĄCZANIE DO SIECI LORAWAN (OTAA)
   Serial.println(F("Konfiguracja kluczy..."));
@@ -76,6 +99,12 @@ void setup() {
 
   Serial.println(F("Wysyłam żądanie Join..."));
   state = node.activateOTAA();
+
+  // 5. BARDZO WAŻNE: Niezależnie od wyniku (sukces czy błąd), RadioLib podbił
+  // licznik. Zapisujemy nowy stan bufora z powrotem do trwałej pamięci Flash!
+  preferences.putBytes("nonces", noncesBuffer,
+                       RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+  preferences.end(); // Zamykamy dostęp do pamięci
 
   if (state == RADIOLIB_ERR_NONE) {
     Serial.println(F("SUKCES! Połączono z ChirpStackiem!"));
