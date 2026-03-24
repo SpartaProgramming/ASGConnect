@@ -2,217 +2,240 @@
 // #include <Preferences.h>
 // #include <RadioLib.h>
 // #include <SPI.h>
+// #include <TinyGPS++.h> // Dodana biblioteka GPS
 // #include <Wire.h>
 // #include <XPowersLib.h>
 
-// Preferences preferences;
+// // --- KLUCZE ---
+// uint64_t joinEui = 0x0000000000000000;
+// uint64_t devEui = 0xe082243450f29654;
+// uint8_t appKey[] = {0x01, 0x0d, 0xd9, 0xd8, 0xed, 0x9c, 0x97, 0x1f,
+//                     0xf6, 0xf1, 0x67, 0xd4, 0xe2, 0xdb, 0x8e, 0xe6};
 
-// uint8_t noncesBuffer[RADIOLIB_LORAWAN_NONCES_BUF_SIZE];
-
-// // --- KONFIGURACJA ZASILANIA (AXP2101) ---
-// XPowersAXP2101 PMU;
+// // --- SPRZĘT ---
 // #define I2C_SDA 21
 // #define I2C_SCL 22
-
-// // --- PINY LORA DLA T-BEAM V1.2 (SX1262) ---
 // #define LORA_CS 18
 // #define LORA_DIO1 33
 // #define LORA_RST 23
 // #define LORA_BUSY 32
 
+// // --- GPS Piny dla T-Beam v1.2 ---
+// #define GPS_RX_PIN 34
+// #define GPS_TX_PIN 12
+
+// XPowersAXP2101 PMU;
+// SX1262 radio = new Module(LORA_CS, LORA_DIO1, LORA_RST, LORA_BUSY);
+// LoRaWANNode node(&radio, &EU868);
+// Preferences preferences;
+
+// TinyGPSPlus gps;
+// HardwareSerial GPS_Serial(1);
+
+// uint8_t sessionBuffer[RADIOLIB_LORAWAN_NONCES_BUF_SIZE];
 // bool isJoined = false;
 
-// // Inicjalizacja modułu radiowego w bibliotece RadioLib
-// SX1262 radio = new Module(LORA_CS, LORA_DIO1, LORA_RST, LORA_BUSY);
+// // Stoper do wysyłania pakietów (co 20 sekund)
+// uint32_t lastSendTime = 0;
+// const uint32_t SEND_INTERVAL = 20000;
 
-// // Tworzymy węzeł LoRaWAN (częstotliwość EU868)
-// LoRaWANNode node(&radio, &EU868);
-
-// // --- KLUCZE CHIRPSTACK (SPRAWDŹ CZY SĄ POPRAWNE) ---
-// uint64_t joinEui = 0x0000000000000000;
-// uint64_t devEui = 0xe082243450f29654;
-
-// uint8_t appKey[] = {0x01, 0x0d, 0xd9, 0xd8, 0xed, 0x9c, 0x97, 0x1f,
-//                     0xf6, 0xf1, 0x67, 0xd4, 0xe2, 0xdb, 0x8e, 0xe6};
+// void saveSession() {
+//   if (node.isActivated()) {
+//     preferences.begin("lorawan", false);
+//     uint8_t *persist = node.getBufferNonces();
+//     preferences.putBytes("session", persist,
+//     RADIOLIB_LORAWAN_NONCES_BUF_SIZE); preferences.end();
+//     Serial.println(F(">>> Sesja (klucze + liczniki) zapisana do Flash."));
+//   }
+// }
 
 // void setup() {
 //   Serial.begin(115200);
 //   while (!Serial)
 //     ;
-//   Serial.println(F("--- Start T-Beam ASG Tag (Class-C) ---"));
+//   Serial.println(F("\n--- T-BEAM V1.2 ASG TRACKER ---"));
 
-//   // 1. URUCHAMIANIE ZASILANIA (AXP2101)
+//   // 1. ZASILANIE (AXP2101)
 //   Wire.begin(I2C_SDA, I2C_SCL);
 //   if (PMU.init(Wire, I2C_SDA, I2C_SCL, AXP2101_SLAVE_ADDRESS)) {
-//     Serial.println(F("PMU: Układ gotowy!"));
-//     PMU.setALDO2Voltage(3300); // Zasilanie SX1262
+//     PMU.setALDO2Voltage(3300); // LoRa
 //     PMU.enableALDO2();
-//     PMU.setALDO3Voltage(3300); // Zasilanie GPS
+//     PMU.setALDO3Voltage(3300); // GPS / Czujniki
 //     PMU.enableALDO3();
-//   } else {
-//     Serial.println(F("BŁĄD: Brak AXP2101!"));
-//     while (1)
-//       ;
-//   }
-//   delay(1000);
-
-//   // 2. KONFIGURACJA MAGISTRALI SPI (NAPRAWIONA!)
-//   // Usunięto LORA_CS z nawiasu, żeby sprzętowe SPI nie gryzło się z
-//   RadioLibem! SPI.begin(5, 19, 27);
-
-//   // 3. URUCHAMIANIE RADIA SX1262
-//   Serial.print(F("Inicjalizacja radia... "));
-//   int state = radio.begin();
-//   if (state == RADIOLIB_ERR_NONE) {
-//     Serial.println(F("SUKCES!"));
-//   } else {
-//     Serial.print(F("BŁĄD, kod: "));
-//     Serial.println(state);
-//     while (1)
-//       ;
+//     PMU.setALDO4Voltage(3300); // GPS / Zapasowe V1.2
+//     PMU.enableALDO4();
+//     Serial.println(F("Zasilanie PMU włączone (LoRa + GPS)."));
 //   }
 
-//   // POPRAWKI SPRZĘTOWE DLA T-BEAM V1.2
-//   radio.setTCXO(3.3);               // T-Beam używa kwarcu 3.3V (nie 1.8V!)
-//   radio.setDio2AsRfSwitch(true);    // Automatyczny przełącznik anteny
-//   radio.setRxBoostedGainMode(true); // Wzmocnienie czułości odbiornika
+//   // 2. INICJALIZACJA GPS
+//   GPS_Serial.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+//   Serial.println(F("Odbiornik GPS gotowy."));
 
-//   // 1. Otwieramy przestrzeń w pamięci Flash pod nazwą "lorawan"
+//   // 3. RADIO
+//   SPI.begin(5, 19, 27);
+//   radio.begin();
+//   radio.setTCXO(3.3);
+//   radio.setDio2AsRfSwitch(true);
+
+//   // 4. WCZYTYWANIE SESJI
 //   preferences.begin("lorawan", false);
-
-//   // 2. Sprawdzamy, czy mamy już zapisane liczniki z poprzedniego
-//   uruchomienia size_t len = preferences.getBytesLength("nonces"); if (len ==
-//   RADIOLIB_LORAWAN_NONCES_BUF_SIZE) {
-//     Serial.println("Wczytuję zapisane liczniki Nonce z pamięci Flash...");
-//     preferences.getBytes("nonces", noncesBuffer,
+//   if (preferences.getBytesLength("session") ==
+//       RADIOLIB_LORAWAN_NONCES_BUF_SIZE) {
+//     preferences.getBytes("session", sessionBuffer,
 //                          RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
-
-//     uint16_t devNonce = noncesBuffer[0] | (noncesBuffer[1] << 8);
-//     devNonce++; // Zwiększamy licznik o 1
-
-//     // Zapisujemy powrotem do bufora
-//     noncesBuffer[0] = devNonce & 0xFF;
-//     noncesBuffer[1] = (devNonce >> 8) & 0xFF;
-
-//     Serial.print(F("RĘCZNIE podbito DevNonce do: "));
-//     Serial.println(devNonce);
-
+//     Serial.println(F("Wczytano dane z Flash."));
 //   } else {
-//     Serial.println("Brak zapisanych liczników, zaczynamy od zera.");
-//     // Zerujemy bufor na wszelki wypadek
-//     memset(noncesBuffer, 0, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+//     memset(sessionBuffer, 0, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+//     Serial.println(F("Brak sesji we Flash."));
 //   }
+//   preferences.end();
 
-//   // --- TESTOWE WYŚWIETLANIE: STAN BUFORA PRZED JOIN ---
-//   Serial.print(F("DEBUG - Bufor Nonce PRZED OTAA: "));
-//   for (int i = 0; i < RADIOLIB_LORAWAN_NONCES_BUF_SIZE; i++) {
-//     if (noncesBuffer[i] < 0x10)
-//       Serial.print("0");
-//     Serial.print(noncesBuffer[i], HEX);
-//     Serial.print(" ");
-//   }
-//   Serial.println();
-
-//   // 3. Mówimy bibliotece RadioLib: "Hej, używaj tego bufora do liczników!"
-//   node.setBufferNonces(noncesBuffer);
-
-//   // 4. DOŁĄCZANIE DO SIECI LORAWAN (OTAA)
-//   Serial.println(F("Konfiguracja kluczy..."));
 //   node.beginOTAA(joinEui, devEui, appKey, appKey);
+//   node.setBufferNonces(sessionBuffer);
 
-//   Serial.println(F("Wysyłam żądanie Join..."));
-//   state = node.activateOTAA();
-
-//   uint8_t *persist = node.getBufferNonces();
-
-//   // --- TESTOWE WYŚWIETLANIE: STAN BUFORA PO JOIN ---
-//   Serial.print(F("DEBUG - Bufor Nonce PO OTAA:    "));
-//   for (int i = 0; i < RADIOLIB_LORAWAN_NONCES_BUF_SIZE; i++) {
-//     // ZMIANA TUTAJ: Używamy 'persist', a nie 'noncesBuffer'!
-//     if (persist[i] < 0x10)
-//       Serial.print("0");
-//     Serial.print(persist[i], HEX);
-//     Serial.print(" ");
-//   }
-//   Serial.println();
-//   // -------------------------------------------------
-
-//   // 5. BARDZO WAŻNE: Niezależnie od wyniku (sukces czy błąd), RadioLib
-//   podbił
-//   // licznik. Zapisujemy nowy stan bufora z powrotem do trwałej pamięci
-//   Flash! preferences.putBytes("nonces", persist,
-//   RADIOLIB_LORAWAN_NONCES_BUF_SIZE); preferences.end(); // Zamykamy dostęp do
-//   pamięci
-
-//   // Sprawdzamy czy nie ma błędów (0) ALBO czy mamy nową sesję (-1118)
-//   if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NEW_SESSION) {
-//     Serial.println(F("SUKCES! Połączono z ChirpStackiem!"));
-//     isJoined = true; // Zezwalamy na działanie loop()
+//   // 5. SPRAWDZENIE AKTYWACJI
+//   if (node.isActivated()) {
+//     Serial.println(F("SESJA PRZYWRÓCONA!"));
+//     isJoined = true;
 //   } else {
-//     Serial.print(F("Błąd łączenia, kod: "));
-//     Serial.println(state);
-//     isJoined = false; // Blokujemy loop()
+//     Serial.println(F("Wymagany Join..."));
+//     uint16_t devNonce = sessionBuffer[0] | (sessionBuffer[1] << 8);
+//     devNonce++;
+//     sessionBuffer[0] = devNonce & 0xFF;
+//     sessionBuffer[1] = (devNonce >> 8) & 0xFF;
+
+//     int state = node.activateOTAA();
+//     if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NEW_SESSION)
+//     {
+//       Serial.println(F("JOIN SUKCES!"));
+//       isJoined = true;
+
+//       saveSession();
+//     } else {
+//       Serial.printf("Błąd Join: %d. Zapisuję Nonce.\n", state);
+//       preferences.begin("lorawan", false);
+//       preferences.putBytes("session", sessionBuffer,
+//                            RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+//       preferences.end();
+//     }
 //   }
 // }
 
 // void loop() {
-//   if (!isJoined) {
-//     Serial.println(F("Brak połączenia z siecią. Czekam..."));
-//     delay(10000);
-//     return; // Przerywa wykonywanie loop i zaczyna od nowa
+//   // 1. Zawsze karmimy obiekt GPS nowymi danymi z portu szeregowego
+//   while (GPS_Serial.available() > 0) {
+//     gps.encode(GPS_Serial.read());
 //   }
 
-//   Serial.println(F("Wysyłam pakiet..."));
-//   String message = "Hello ASG";
-//   int state = node.sendReceive((uint8_t *)message.c_str(), message.length());
+//   // 2. Co 20 sekund wysyłamy pakiet
+//   if (millis() - lastSendTime >= SEND_INTERVAL) {
+//     lastSendTime = millis(); // Resetujemy stoper
 
-//   if (state == RADIOLIB_ERR_NONE) {
-//     Serial.println(F("Wysłano!"));
-//   } else {
-//     Serial.print(F("Błąd wysyłania: "));
-//     Serial.println(state);
+//     if (isJoined) {
+//       uint8_t payload[8] = {0, 0, 0, 0, 0, 0, 0, 0}; // Pusty pakiet startowy
+
+//       // Jeśli mamy poprawną pozycję GPS
+//       if (gps.location.isValid()) {
+//         int32_t lat = gps.location.lat() * 100000;
+//         int32_t lon = gps.location.lng() * 100000;
+
+//         // Pakowanie szerokości geograficznej (4 bajty)
+//         payload[0] = (lat >> 24) & 0xFF;
+//         payload[1] = (lat >> 16) & 0xFF;
+//         payload[2] = (lat >> 8) & 0xFF;
+//         payload[3] = lat & 0xFF;
+
+//         // Pakowanie długości geograficznej (4 bajty)
+//         payload[4] = (lon >> 24) & 0xFF;
+//         payload[5] = (lon >> 16) & 0xFF;
+//         payload[6] = (lon >> 8) & 0xFF;
+//         payload[7] = lon & 0xFF;
+
+//         Serial.print(F("Wysyłam GPS: Lat="));
+//         Serial.print(gps.location.lat(), 5);
+//         Serial.print(F(" Lon="));
+//         Serial.println(gps.location.lng(), 5);
+//       } else {
+//         Serial.println(
+//             F("Brak FIXa GPS. Wysyłam pakiet zerowy (sygnał życia)..."));
+//       }
+
+//       int state = node.sendReceive(payload, sizeof(payload));
+
+//       if (state == RADIOLIB_ERR_NONE || state ==
+//       RADIOLIB_LORAWAN_NO_DOWNLINK) {
+//         Serial.println(F("Wysłano OK!"));
+//         saveSession();
+//       } else {
+//         Serial.printf("Błąd nadawania: %d\n", state);
+//         if (state == -1101)
+//           isJoined = false; // Utrata sesji
+//       }
+//     } else {
+//       Serial.println(F("Urządzenie niepołączone (brak Joina)."));
+//     }
 //   }
-
-//   // Tymczasowe opóźnienie dla testów
-//   delay(6000);
 // }
+
 #include <Arduino.h>
 #include <Preferences.h>
 #include <RadioLib.h>
 #include <SPI.h>
+#include <TinyGPS++.h>
 #include <Wire.h>
 #include <XPowersLib.h>
 
-// --- KLUCZE ---
+// --- KLUCZE LORAWAN ---
 uint64_t joinEui = 0x0000000000000000;
 uint64_t devEui = 0xe082243450f29654;
 uint8_t appKey[] = {0x01, 0x0d, 0xd9, 0xd8, 0xed, 0x9c, 0x97, 0x1f,
                     0xf6, 0xf1, 0x67, 0xd4, 0xe2, 0xdb, 0x8e, 0xe6};
 
-// --- SPRZĘT ---
+// --- SPRZĘT I PINY ---
 #define I2C_SDA 21
 #define I2C_SCL 22
 #define LORA_CS 18
 #define LORA_DIO1 33
 #define LORA_RST 23
 #define LORA_BUSY 32
+#define GPS_RX_PIN 34
+#define GPS_TX_PIN 12
 
 XPowersAXP2101 PMU;
 SX1262 radio = new Module(LORA_CS, LORA_DIO1, LORA_RST, LORA_BUSY);
 LoRaWANNode node(&radio, &EU868);
 Preferences preferences;
 
+TinyGPSPlus gps;
+HardwareSerial GPS_Serial(1);
+
+// Automatyczne dopasowanie bufora do wersji RadioLib (v6 lub v7+)
+#if defined(RADIOLIB_LORAWAN_SESSION_BUF_SIZE)
+uint8_t sessionBuffer[RADIOLIB_LORAWAN_SESSION_BUF_SIZE];
+#else
 uint8_t sessionBuffer[RADIOLIB_LORAWAN_NONCES_BUF_SIZE];
+#endif
+
 bool isJoined = false;
 
+// --- TIMERY ---
+uint32_t lastGpsTime = 0;
+uint32_t lastPingTime = 0;
+const uint32_t GPS_INTERVAL = 20000; // GPS co 20 sekund
+const uint32_t PING_INTERVAL = 7000; // Ping co 7 sekund
+
 void saveSession() {
-  // Zapisujemy tylko jeśli sesja jest faktycznie aktywna w bibliotece
   if (node.isActivated()) {
     preferences.begin("lorawan", false);
+#if defined(RADIOLIB_LORAWAN_SESSION_BUF_SIZE)
+    uint8_t *persist = node.getBufferSession();
+    preferences.putBytes("session", persist, RADIOLIB_LORAWAN_SESSION_BUF_SIZE);
+#else
     uint8_t *persist = node.getBufferNonces();
     preferences.putBytes("session", persist, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+#endif
     preferences.end();
-    Serial.println(F(">>> Sesja (klucze + liczniki) zapisana do Flash."));
+    Serial.println(F(">>> Stan sesji zaktualizowany i zapisany do Flash."));
   }
 }
 
@@ -220,87 +243,151 @@ void setup() {
   Serial.begin(115200);
   while (!Serial)
     ;
-  Serial.println(F("\n--- T-BEAM LORAWAN V3 (The Fixer) ---"));
+  Serial.println(F("\n--- T-BEAM V1.2 ASG TRACKER (Z AUTO-RECOVERY) ---"));
 
-  // 1. ZASILANIE
+  // Zasilanie PMU
   Wire.begin(I2C_SDA, I2C_SCL);
   if (PMU.init(Wire, I2C_SDA, I2C_SCL, AXP2101_SLAVE_ADDRESS)) {
     PMU.setALDO2Voltage(3300);
     PMU.enableALDO2();
     PMU.setALDO3Voltage(3300);
     PMU.enableALDO3();
+    PMU.setALDO4Voltage(3300);
+    PMU.enableALDO4();
+    Serial.println(F("Zasilanie uruchomione."));
   }
 
-  // 2. RADIO
+  // GPS i Radio
+  GPS_Serial.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
   SPI.begin(5, 19, 27);
   radio.begin();
   radio.setTCXO(3.3);
   radio.setDio2AsRfSwitch(true);
 
-  // 3. WCZYTYWANIE SESJI
+  // Wczytywanie pamięci sesji LoRaWAN
   preferences.begin("lorawan", false);
-  if (preferences.getBytesLength("session") ==
-      RADIOLIB_LORAWAN_NONCES_BUF_SIZE) {
-    preferences.getBytes("session", sessionBuffer,
-                         RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
-    Serial.println(F("Wczytano dane z Flash."));
+  if (preferences.getBytesLength("session") == sizeof(sessionBuffer)) {
+    preferences.getBytes("session", sessionBuffer, sizeof(sessionBuffer));
   } else {
-    memset(sessionBuffer, 0, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
-    Serial.println(F("Brak sesji we Flash."));
+    memset(sessionBuffer, 0, sizeof(sessionBuffer));
   }
   preferences.end();
 
-  // --- KLUCZOWA KOLEJNOŚĆ ---
-  node.beginOTAA(joinEui, devEui, appKey, appKey); // Najpierw parametry
-  node.setBufferNonces(sessionBuffer); // Potem wstrzyknięcie bufora
+  node.beginOTAA(joinEui, devEui, appKey, appKey);
 
-  // 4. SPRAWDZENIE AKTYWACJI
+#if defined(RADIOLIB_LORAWAN_SESSION_BUF_SIZE)
+  node.setBufferSession(sessionBuffer);
+#else
+  node.setBufferNonces(sessionBuffer);
+#endif
+
+  // Aktywacja sieci
   if (node.isActivated()) {
-    Serial.println(F("SESJA PRZYWRÓCONA! Biblioteka gotowa do nadawania."));
+    Serial.println(F("SESJA PRZYWRÓCONA Z FLASH!"));
     isJoined = true;
   } else {
-    Serial.println(F("Sesja nieaktywna. Wymagany Join..."));
-
-    // Podbicie Nonce przed nowym Joinem
-    uint16_t devNonce = sessionBuffer[0] | (sessionBuffer[1] << 8);
-    devNonce++;
-    sessionBuffer[0] = devNonce & 0xFF;
-    sessionBuffer[1] = (devNonce >> 8) & 0xFF;
-
-    int state = node.activateOTAA();
-    if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NEW_SESSION) {
-      Serial.println(F("JOIN SUKCES!"));
-      isJoined = true;
-      saveSession();
-    } else {
-      Serial.printf("Błąd Join: %d. Zapisuję Nonce.\n", state);
-      // Nawet jak join padnie, zapiszmy podbity Nonce we Flashu!
-      preferences.begin("lorawan", false);
-      preferences.putBytes("session", sessionBuffer,
-                           RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
-      preferences.end();
-    }
+    Serial.println(F("Sesja pusta lub przedawniona - zostawiam zadanie dla "
+                     "pętli (Auto-Join)..."));
   }
 }
 
 void loop() {
-  if (isJoined) {
-    Serial.print(F("Wysyłam pakiet... "));
-    String msg = "Hello ASG";
-    int state = node.sendReceive((uint8_t *)msg.c_str(), msg.length());
-
-    if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NO_DOWNLINK) {
-      Serial.println(F("OK!"));
-      saveSession(); // Zapisujemy FCnt (licznik wiadomości)
-    } else {
-      Serial.printf("Błąd: %d\n", state);
-      // Jeśli błąd to -1101, spróbujmy zresetować flagę (na wypadek utraty
-      // sesji)
-      if (state == -1101)
-        isJoined = false;
-    }
-  } else {
-    Serial.println(F("Urządzenie niepołączone."));
+  // 1. Zawsze zbieramy dane GPS w tle
+  while (GPS_Serial.available() > 0) {
+    gps.encode(GPS_Serial.read());
   }
-  delay(20000);
+
+  uint32_t now = millis();
+
+  // 2. AUTO-RECOVERY: Jeśli straciliśmy sesję, próbujemy ją odnowić (Re-Join)
+  // co 10 sekund
+  if (!isJoined) {
+    static uint32_t lastJoinRetry = 0;
+    if (now - lastJoinRetry >= 10000 || lastJoinRetry == 0) {
+      lastJoinRetry = now;
+      Serial.println(
+          F("\n[!] Brak sesji. Negocjuję nowe połączenie OTAA (Join)..."));
+
+      int state = node.activateOTAA();
+      if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NEW_SESSION) {
+        Serial.println(F("[!] JOIN SUKCES! Odzyskałem połączenie."));
+        isJoined = true;
+        saveSession();
+      } else {
+        Serial.printf("[!] Błąd Join: %d. Ponowię za 10 sekund...\n", state);
+      }
+    }
+    return; // Wychodzimy z loop() dopóki nie wróci sieć
+  }
+
+  // 3. Logika wysyłania (GPS vs Ping)
+  uint8_t downData[256];
+  size_t downLen = 0;
+  int state = RADIOLIB_ERR_NONE;
+  bool packetSent = false;
+
+  // A) Pakiet GPS co 20 sekund
+  if (now - lastGpsTime >= GPS_INTERVAL) {
+    lastGpsTime = now;
+    lastPingTime = now;
+
+    uint8_t payload[8] = {0};
+    if (gps.location.isValid()) {
+      int32_t lat = gps.location.lat() * 100000;
+      int32_t lon = gps.location.lng() * 100000;
+      payload[0] = (lat >> 24) & 0xFF;
+      payload[1] = (lat >> 16) & 0xFF;
+      payload[2] = (lat >> 8) & 0xFF;
+      payload[3] = lat & 0xFF;
+      payload[4] = (lon >> 24) & 0xFF;
+      payload[5] = (lon >> 16) & 0xFF;
+      payload[6] = (lon >> 8) & 0xFF;
+      payload[7] = lon & 0xFF;
+      Serial.println(F("📡 Wysyłam GPS (8 bajtów)..."));
+    } else {
+      Serial.println(F("📡 Brak FIXa GPS. Wysyłam same zera..."));
+    }
+
+    state = node.sendReceive(payload, sizeof(payload), 1, downData, &downLen);
+    packetSent = true;
+
+    // B) Szybki PING co 7 sekund
+  } else if (now - lastPingTime >= PING_INTERVAL) {
+    lastPingTime = now;
+    Serial.println(F("⚡ Wysyłam szybki PING (1 bajt) - otwieram okno RX..."));
+    uint8_t pingPayload[1] = {0x00};
+    state = node.sendReceive(pingPayload, sizeof(pingPayload), 1, downData,
+                             &downLen);
+    packetSent = true;
+  }
+
+  // C) Analiza odpowiedzi i wychwytywanie "Zawałów Sesji"
+  if (packetSent) {
+    if (state == RADIOLIB_ERR_NONE) {
+      if (downLen > 0) {
+        Serial.println(F("\n====================================="));
+        Serial.printf("📥 ODEBRANO ROZKAZ Z BAZY! (Długość: %d)\n", downLen);
+        Serial.print(F("Treść: "));
+        for (size_t i = 0; i < downLen; i++) {
+          Serial.print((char)downData[i]);
+        }
+        Serial.println(F("\n=====================================\n"));
+      } else {
+        Serial.println(F("Wysłano OK. Kolejka RX na serwerze pusta."));
+      }
+      saveSession(); // Zapisujemy zaktualizowane liczniki ramek
+
+    } else {
+      Serial.printf("Błąd radiowy: %d\n", state);
+      // Łapiemy błędy krytyczne: brak połączenia, przymusowy Re-Join (1116),
+      // port invalid
+      if (state == RADIOLIB_ERR_NETWORK_NOT_JOINED || state == -1116 ||
+          state == -1101 || state == -1104) {
+        Serial.println(
+            F(">> KRYTYCZNY BŁĄD SESJI. Oznaczam jako niepołączony. <<"));
+        isJoined =
+            false; // To uruchomi mechanizm Auto-Recovery na początku pętli!
+      }
+    }
+  }
 }
