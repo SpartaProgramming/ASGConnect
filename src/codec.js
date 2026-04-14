@@ -1,59 +1,88 @@
-// Rozkodowywanie wiadomości OD urządzenia (T-Beam -> ChirpStack)
+// =========================================================
+// DEKODER UPLINKÓW (Tag -> Serwer LNS -> Twój Backend)
+// Tłumaczy tablicę bajtów z radia na obiekt JSON
+// =========================================================
 function decodeUplink(input) {
-  let bytes = input.bytes;
-  let decoded = {};
+  var bytes = input.bytes;
+  var decoded = {};
 
-  // 1. Sprawdzamy czy to krótki PING (1 bajt)
-  if (bytes.length === 1) {
-    decoded.type = 'ping';
-    decoded.message = 'Otwarcie okna RX';
-    return {data: decoded};
+  if (bytes.length === 0) {
+    return {errors: ['Pusty payload']};
   }
 
-  // 2. Sprawdzamy czy to pełny pakiet GPS (8 bajtów)
-  if (bytes.length === 8) {
-    // Operacje bitowe w JS poprawnie zachowują znak minus (Signed 32-bit
-    // Integer)
-    let latRaw =
-        (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
-    let lonRaw =
-        (bytes[4] << 24) | (bytes[5] << 16) | (bytes[6] << 8) | bytes[7];
+  var opCode = bytes[0];
 
-    decoded.type = 'gps';
+  switch (opCode) {
+    case 0x01:  // UL_TELEMETRY
+      if (bytes.length >= 9) {
+        decoded.type = 'TELEMETRY';
 
-    // Jeśli same zera (brak fixa)
-    if (latRaw === 0 && lonRaw === 0) {
-      decoded.latitude = 0;
-      decoded.longitude = 0;
-      decoded.valid = false;
-    } else {
-      decoded.latitude = latRaw / 100000.0;
-      decoded.longitude = lonRaw / 100000.0;
-      decoded.valid = true;
-    }
+        // Odzyskiwanie 32-bitowych liczb całkowitych ze znakiem (Bit Shifting)
+        var latInt =
+            (bytes[1] << 24) | (bytes[2] << 16) | (bytes[3] << 8) | bytes[4];
+        var lonInt =
+            (bytes[5] << 24) | (bytes[6] << 16) | (bytes[7] << 8) | bytes[8];
 
-    return {data: decoded};
+        // Dzielenie przez milion, aby odzyskać wartości zmiennoprzecinkowe
+        decoded.lat = latInt / 1000000.0;
+        decoded.lon = lonInt / 1000000.0;
+      } else {
+        return {errors: ['Zla dlugosc ramki telemetrii']};
+      }
+      break;
+
+    case 0x02:  // UL_KILLED
+      decoded.type = 'KILLED';
+      decoded.message = 'Gracz zostal wyeliminowany!';
+      break;
+
+    default:
+      return {errors: ['Nieznany OpCode Uplinku: ' + opCode]};
   }
 
-  // Jeśli przyszedł nieznany format danych
-  return {data: {error: 'Nieznany format payloadu'}};
+  return {data: decoded};
 }
 
-// Kodowanie wiadomości DO urządzenia (ChirpStack -> T-Beam)
+// =========================================================
+// ENKODER DOWNLINKÓW (Twój Backend -> Serwer LNS -> Tag)
+// Tłumaczy JSON wysłany z Twojego serwera na bajty dla Taga
+// =========================================================
 function encodeDownlink(input) {
-  // Jeśli z panelu lub skryptu wpadnie {"command": "TEKST"}
-  if (input.data.command) {
-    let str = input.data.command;
-    let bytes = [];
+  var data = input.data;
+  var bytes = [];
 
-    // Konwertujemy tekst na tablicę bajtów ASCII
-    for (let i = 0; i < str.length; i++) {
-      bytes.push(str.charCodeAt(i));
+  if (data.type === 'CONFIG') {
+    bytes.push(0x01);  // DL_CONFIG
+    bytes.push(data.team === 'BLUE' ? 1 : 0);
+    bytes.push(data.gameType);
+
+    // Czas z minut na 2 bajty (Big Endian)
+    bytes.push((data.timeMins >> 8) & 0xFF);
+    bytes.push(data.timeMins & 0xFF);
+
+    bytes.push(data.alliesTotal);
+    bytes.push(data.enemiesTotal);
+
+    // Zamiana stringa (nicku) na tablicę bajtów (ASCII)
+    for (var i = 0; i < data.nickname.length; i++) {
+      bytes.push(data.nickname.charCodeAt(i));
     }
-
-    // Zwracamy na domyślnym porcie fPort = 1
-    return {bytes: bytes, fPort: 1};
+  } else if (data.type === 'COMMAND') {
+    bytes.push(0x02);  // DL_COMMAND
+    // Mapowanie stringów na bajty komend
+    var cmdMap = {
+      'START': 0x10,
+      'END': 0x11,
+      'WIN_BLUE': 0x12,
+      'WIN_RED': 0x13,
+      'YOU_DIED': 0x14
+    };
+    bytes.push(cmdMap[data.commandId]);
+  } else if (data.type === 'UPDATE') {
+    bytes.push(0x03);  // DL_UPDATE
+    bytes.push(data.alliesAlive);
+    bytes.push(data.enemiesAlive);
   }
 
-  return {bytes: []};
+  return {bytes: bytes, fPort: 1};
 }

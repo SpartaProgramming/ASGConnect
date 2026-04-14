@@ -25,7 +25,13 @@ private:
 public:
   LoRaManager(uint64_t joinEui, uint64_t devEui, uint8_t *appKey);
   void begin();
-  void process(GPSManager &gpsManager);
+
+  bool sendPacket(uint8_t *payload, size_t length, bool confirmed);
+  size_t receivePacket(uint8_t *buffer);
+
+  void maintainConnection();
+
+  bool isConnected() const { return isJoined; }
 };
 
 #endif
