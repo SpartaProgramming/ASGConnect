@@ -27,11 +27,13 @@ public:
   void begin();
 
   bool sendPacket(uint8_t *payload, size_t length, bool confirmed);
+
   size_t receivePacket(uint8_t *buffer);
 
   void maintainConnection();
 
   bool isConnected() const { return isJoined; }
+  void receiveDownlink();
 };
 
 #endif

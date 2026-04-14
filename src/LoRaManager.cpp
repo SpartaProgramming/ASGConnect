@@ -1,6 +1,8 @@
 #include "LoRaManager.h"
 #include "PacketHandler.h"
 
+bool firstMessageSent = false;
+
 // zależnosć obiektów: Module(PINY) -> SX1262(Sterownik Chipu) ->
 // LoRaWANNode(Stos Protokołu)
 LoRaManager::LoRaManager(uint64_t joinEui, uint64_t devEui, uint8_t *appKey)
@@ -17,7 +19,7 @@ void LoRaManager::begin() {
   int state = _radio.begin();
   if (state == RADIOLIB_ERR_NONE) {
     Serial.println(F("OK"));
-    _radio.setTCXO(3.3); // oscylator z kompensacją temperaturową
+    _radio.setTCXO(1.6); // oscylator z kompensacją temperaturową lub 3.3V
     _radio.setDio2AsRfSwitch(
         true); // DIO2 jako sterowanie przełącznikiem antenowym
   } else
@@ -38,6 +40,9 @@ void LoRaManager::begin() {
       _joinEui, _devEui, _appKey,
       _appKey); // identyfikator aplikacji, identyfikator urządzenia, klucz
                 // sieciowy(szyfrujacy), klucz aplikacyjny
+
+  _node.setADR(true);
+
   _node.setClass(RADIOLIB_LORAWAN_CLASS_C);
   _node.setBufferSession(sessionBuffer);
 
@@ -46,6 +51,12 @@ void LoRaManager::begin() {
     isJoined = true;
   } else {
     Serial.println(F("[LoRa] Urządzenie nieaktywne. Wymagany Join."));
+  }
+
+  if (isJoined && !firstMessageSent) {
+    uint8_t ping = 0x01; // Nasz OpCode dla Telemetrii (nawet z zerami)
+    _node.sendReceive(&ping, 1);
+    firstMessageSent = true;
   }
 }
 
@@ -65,11 +76,18 @@ size_t LoRaManager::receivePacket(uint8_t *buffer) {
     saveSession();
     return rxLen;
   }
+
+  if (dlState != RADIOLIB_ERR_NONE && dlState != RADIOLIB_ERR_RX_TIMEOUT) {
+    Serial.printf("[LoRa] BŁĄD SPRZĘTOWY/PROTOKOŁU: %d\n", dlState);
+  }
+
   return 0;
 }
 
 void LoRaManager::maintainConnection() {
   if (!isJoined) {
+    firstMessageSent =
+        false; // Reset flagi, żeby po ponownym dołączeniu wysłać telemetrię
     Serial.print(F("[LoRa] Wysylam zadanie Join (OTAA)... "));
     int state = _node.activateOTAA();
 
@@ -78,6 +96,11 @@ void LoRaManager::maintainConnection() {
     if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NEW_SESSION) {
       Serial.println(F("POLACZONO!"));
       isJoined = true;
+
+      uint8_t ping = 0x01; // Nasz OpCode dla Telemetrii (nawet z zerami)
+      _node.sendReceive(&ping, 1);
+      firstMessageSent = true;
+
     } else {
       Serial.printf("NIEUDANE (kod: %d). Nastepna proba... \n", state);
     }
@@ -88,19 +111,21 @@ bool LoRaManager::sendPacket(uint8_t *payload, size_t length, bool confirmed) {
   if (!isJoined)
     return false;
 
-  // W RadioLib sendReceive domyślnie przyjmuje: (dane, długość, port,
-  // isConfirmed) Port = 1 (domyślny port aplikacji dla naszych OpCodes)
+  // 1. Wychodzimy z ciągłego nasłuchu (Klasa C) do trybu czuwania z
+  // podtrzymaniem kwarcu
+  _radio.standby(RADIOLIB_SX126X_STANDBY_XOSC);
+
+  // 2. Najprostsza, działająca wersja wysyłki
+  // Parametry: bufor danych, długość, port (domyślnie 1), czy wymaga
+  // potwierdzenia (ACK)
   int txState = _node.sendReceive(payload, length, 1, confirmed);
 
   if (txState == RADIOLIB_ERR_NONE || txState == RADIOLIB_LORAWAN_NEW_SESSION) {
-    Serial.printf("[LoRa] Uplink wyslany! Rozmiar: %d bajtow\n", length);
+    Serial.println(F("[LoRa] Uplink wysłany pomyślnie!"));
     saveSession();
     return true;
   } else {
-    Serial.printf("[LoRa] Blad wysylania: %d\n", txState);
-    if (txState == RADIOLIB_ERR_NETWORK_NOT_JOINED) {
-      isJoined = false; // Wymuszamy ponowny Join
-    }
+    Serial.printf("[LoRa] Błąd wysyłania: %d\n", txState);
     return false;
   }
 }
@@ -125,5 +150,35 @@ void LoRaManager::saveSession() {
     } else {
       Serial.println(F("BŁĄD"));
     }
+  }
+}
+
+void LoRaManager::receiveDownlink() {
+  if (!isJoined) return;
+
+  uint8_t rxBuffer[256];
+  size_t rxLen = 0;
+  LoRaWANEvent_t dlEvent;
+
+  // Funkcja sprawdza, czy w tle odebrano i zdekodowano pakiet w oknie RXC
+  int16_t state = _node.getDownlinkClassC(rxBuffer, &rxLen, &dlEvent);
+
+  // W RadioLib dla getDownlinkClassC zwrócenie wartości > 0 (najczęściej 3, oznaczające okno RXC) to sukces
+  if (state > 0) {
+    if (rxLen > 0) {
+      Serial.printf("[LoRa] Odebrano Downlink Klasy C! Długość: %d bajtów\n", rxLen);
+      Serial.print("[LoRa] Payload: ");
+      for (size_t i = 0; i < rxLen; i++) {
+        Serial.printf("%02X ", rxBuffer[i]);
+      }
+      Serial.println();
+    } else {
+      Serial.println("[LoRa] Odebrano pusty downlink (np. komenda sieciowa MAC lub same potwierdzenie).");
+    }
+  } 
+  // RADIOLIB_ERR_NONE (0) oznacza brak pakietu - naturalny stan podczas nasłuchu.
+  // RADIOLIB_ERR_DOWNLINK_MALFORMED często pojawia się przy szumie radiowym - ignorujemy go.
+  else if (state != RADIOLIB_ERR_NONE && state != RADIOLIB_ERR_DOWNLINK_MALFORMED) {
+     Serial.printf("[LoRa] Błąd odbioru Klasy C: %d\n", state);
   }
 }
