@@ -1,3 +1,4 @@
+#include "DisplayManager.h"
 #include "GPSManager.h"
 #include "LoRaManager.h"
 #include "PowerManager.h"
@@ -12,6 +13,9 @@ uint8_t appKey[] = {0x01, 0x0d, 0xd9, 0xd8, 0xed, 0x9c, 0x97, 0x1f,
 PowerManager power;
 GPSManager gpsSystem;
 LoRaManager lora(joinEui, devEui, appKey);
+DisplayManager display;
+
+QueueHandle_t telemetryQueue;
 
 void taskGPS(void *pvParameters) {
   for (;;) {
@@ -27,14 +31,34 @@ void taskLoRa(void *pvParameters) {
   }
 }
 
+void taskDisplay(void *pvParameters) {
+  TelemetryData incomingData;
+
+  for (;;) {
+
+    if (xQueueReceive(telemetryQueue, &incomingData, portMAX_DELAY) == pdPASS) {
+      display.updateTelemetryUI(incomingData);
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   power.begin();
   gpsSystem.begin();
   lora.begin();
+  display.begin();
+  display.showBootScreen();
+
+  telemetryQueue = xQueueCreate(5, sizeof(TelemetryData));
+
+  if (telemetryQueue == NULL) {
+    Serial.println("Błąd: Nie udało się utworzyć kolejki!");
+  }
 
   xTaskCreate(taskGPS, "GPS_Task", 4096, NULL, 1, NULL);
   xTaskCreate(taskLoRa, "LoRa_Task", 8192, NULL, 2, NULL);
+  xTaskCreate(taskDisplay, "Display_Task", 4096, NULL, 1, NULL);
 }
 
 void loop() { vTaskDelete(NULL); }

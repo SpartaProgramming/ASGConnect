@@ -1,4 +1,5 @@
 #include "LoRaManager.h"
+#include "PacketHandler.h"
 
 // zależnosć obiektów: Module(PINY) -> SX1262(Sterownik Chipu) ->
 // LoRaWANNode(Stos Protokołu)
@@ -59,10 +60,13 @@ void LoRaManager::process(GPSManager &gpsManager) {
                               // AppSKey(do restartu, wygaśnięcia sesji lub
                               // zmiany parametrów sieci)
 
+    saveSession(); // zapisujemy sesję po każdej próbie dołączenia, nawet jeśli
+                   // nieudana (może być potrzebna do diagnostyki)
+
     if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NEW_SESSION) {
       Serial.println(F("POŁĄCZONO!"));
       isJoined = true;
-      saveSession();
+
     } else {
       Serial.printf("NIEUDANE (kod: %d). Następna próba za 10s...\n", state);
       if (state == RADIOLIB_ERR_CHIP_NOT_FOUND)
@@ -73,39 +77,53 @@ void LoRaManager::process(GPSManager &gpsManager) {
   }
 
   // Diagnostyka Downlinku
-  uint8_t rxData[256];
+  uint8_t rxData[256]; // bufor na dane z downlinku
   size_t rxLen = 0;
-  LoRaWANEvent_t dlEvent;
-  int dlState = _node.getDownlinkClassC(rxData, &rxLen, &dlEvent);
+  LoRaWANEvent_t
+      dlEvent; // struktura z informacjami o otrzymanym downlinku (port, RSSI)
+  int dlState = _node.getDownlinkClassC(
+      rxData, &rxLen, &dlEvent); // odszyfrowanie i pobranie danych z downlinku
 
   if (dlState == RADIOLIB_ERR_NONE && rxLen > 0) {
-    Serial.printf("[LoRa] Otrzymano dane: %d bajtów na porcie %d\n", rxLen,
-                  dlEvent.fPort);
+    Serial.printf(
+        "[LoRa] Otrzymano dane: %d bajtów na porcie %d\n", rxLen,
+        dlEvent
+            .fPort); // port 1-223 pozwala rozróżnić różne typy danych, komend
   }
 
   if (millis() - lastTxTime >= TX_INTERVAL) {
     lastTxTime = millis();
-    if (gpsManager.gps.location.isValid()) {
-      Serial.println(F("[LoRa] Przygotowanie uplink..."));
-      uint8_t payload[8];
-      // ... (kod pakowania danych bez zmian) ...
 
-      int txState = _node.sendReceive(payload, 8);
-      if (txState == RADIOLIB_ERR_NONE) {
-        Serial.println(F("[LoRa] Uplink wysłany i potwierdzony."));
-        saveSession();
-      } else {
-        Serial.printf("[LoRa] Błąd wysyłania: %d\n", txState);
-        if (txState == RADIOLIB_ERR_NETWORK_NOT_JOINED)
-          isJoined = false;
-      }
+    Serial.println(F("[LoRa] Przygotowanie uplink z PacketHandler..."));
+
+    // 1. Tworzymy strukturę danych
+    TelemetryData data;
+    static uint32_t msgCount = 0;
+
+    data.messageId = msgCount++;
+    data.temperature = 22.5f;
+    data.batteryLevel = 95;
+    data.latitude = 10.0;  // gpsManager.gps.location.lat();
+    data.longitude = 10.0; // gpsManager.gps.location.lng();
+
+    // 2. Przygotowujemy bufor o odpowiednim rozmiarze
+    uint8_t payload[sizeof(TelemetryData)];
+
+    // 3. Używamy PacketHandler do serializacji (zamiany struktury na bajty)
+    PacketHandler::serialize(data, payload);
+
+    // 4. Wysyłamy dane
+    int txState = _node.sendReceive(payload, sizeof(TelemetryData));
+
+    if (txState == RADIOLIB_ERR_NONE ||
+        txState == RADIOLIB_LORAWAN_NEW_SESSION) {
+      Serial.printf("[LoRa] Uplink wysłany! ID: %d, Rozmiar: %d bajtów\n",
+                    data.messageId, sizeof(TelemetryData));
+      saveSession();
     } else {
-      Serial.println(F("[GPS] Brak fixa. Pomijam wysyłanie uplink."));
-      // Diagnostyka GPS: wypisz ile satelitów widzi
-      Serial.printf("[GPS] Satelity: %d, HDOP: %d\n", // HDOP- Horizontal
-                                                      // Dilution of Precision
-                    gpsManager.gps.satellites.value(),
-                    gpsManager.gps.hdop.value());
+      Serial.printf("[LoRa] Błąd wysyłania: %d\n", txState);
+      if (txState == RADIOLIB_ERR_NETWORK_NOT_JOINED)
+        isJoined = false;
     }
   }
 }

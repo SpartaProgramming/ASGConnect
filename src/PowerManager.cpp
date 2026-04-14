@@ -1,5 +1,12 @@
 #include "PowerManager.h"
 
+#define TFT_CS 25
+#define TFT_DC 2
+#define TFT_MOSI 15
+#define TFT_SCLK 14
+#define TFT_RST 13
+#define TFT_BLK 4
+
 bool PowerManager::begin() {
   Wire.begin(21, 22);
   Serial.print(F("[PMU] Inicjalizacja AXP2101... "));
