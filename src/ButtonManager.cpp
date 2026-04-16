@@ -11,9 +11,9 @@ ButtonManager::ButtonManager(uint8_t pinReady, uint8_t pinKill,
 
 void ButtonManager::begin() {
 
-  pinMode(btnReady.pin, INPUT);
-  pinMode(btnKill.pin, INPUT);
-  pinMode(btnSync.pin, INPUT);
+  pinMode(btnReady.pin, INPUT_PULLUP);
+  pinMode(btnKill.pin, INPUT_PULLUP);
+  pinMode(btnSync.pin, INPUT_PULLUP);
 }
 
 bool ButtonManager::checkPress(BtnState &btn) {

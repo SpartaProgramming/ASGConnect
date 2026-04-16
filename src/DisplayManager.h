@@ -5,11 +5,12 @@
 #include <Arduino.h>
 
 // Definicje pinów dla Twojego ekranu (dostosuj do swojego układu)
-#define TFT_CS 15
-#define TFT_RST 4
+#define TFT_CS 25
 #define TFT_DC 2
-#define TFT_MOSI 23
-#define TFT_SCLK 18
+#define TFT_MOSI 15
+#define TFT_SCLK 14
+#define TFT_RST 13
+#define TFT_BLK 4
 
 class DisplayManager {
 private:

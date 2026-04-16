@@ -3,7 +3,7 @@
 // 0x01 - Telemetria GPS (9 bajtów), pobierana z GameState wartosć lat i lon
 void PacketHandler::buildTelemetry(const GameState &state, uint8_t *buffer,
                                    size_t &len) {
-  buffer[0] = UL_TELEMETRY;
+  buffer[0] = UL_TELEMETRY; // OpCode dla telemetrii
 
   int32_t lat_int = (int32_t)(state.lat * 1000000);
   int32_t lon_int = (int32_t)(state.lon * 1000000);
@@ -27,7 +27,6 @@ void PacketHandler::buildKilled(uint8_t *buffer, size_t &len) {
   len = 1;
 }
 
-// Dekodowanie z Serwera
 void PacketHandler::processDownlink(uint8_t *payload, size_t len,
                                     GameState &state) {
   if (len == 0)
