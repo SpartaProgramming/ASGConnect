@@ -7,9 +7,9 @@ class ButtonManager {
 private:
   struct BtnState {
     uint8_t pin;
-    bool lastReading;
-    bool state;
-    unsigned long lastDebounceTime;
+    bool lastReading; // ostatni odczytany stan (do wykrywania zmian)
+    bool state;       // aktualny stabilny stan
+    unsigned long lastDebounceTime; // czas ostatniej zmiany stanu
   };
 
   BtnState btnReady;

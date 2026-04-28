@@ -27,7 +27,8 @@ bool ButtonManager::checkPress(BtnState &btn) {
 
   // Jeśli minął czas debouncingu i stan jest stabilny
   if ((millis() - btn.lastDebounceTime) > debounceDelay) {
-    if (reading != btn.state) {
+    if (reading !=
+        btn.state) { // Stan się ustabilizował i jest inny niż poprzednio
       btn.state = reading;
 
       // Wykrywamy tylko naciśnięcie (stan niski - przycisk zwiera do GND)
@@ -38,7 +39,8 @@ bool ButtonManager::checkPress(BtnState &btn) {
   }
 
   btn.lastReading = reading;
-  return triggered;
+  return triggered; // zwraca true tylko w momencie wykrycia naciśnięcia
+                    // HIGH->LOW
 }
 
 bool ButtonManager::isReadyPressed() { return checkPress(btnReady); }

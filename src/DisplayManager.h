@@ -20,7 +20,7 @@ public:
   DisplayManager();
   void begin();
   void showBootScreen();
-
-  // Jedyna funkcja potrzebna do rysowania - przyjmuje aktualny Bliźniak Cyfrowy
   void updateGameUI(const GameState &state);
+  void updateTime(uint16_t totalSeconds);
+  void updateGPS(double lat, double lon, GamePhase phase);
 };

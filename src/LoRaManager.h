@@ -1,22 +1,20 @@
 #ifndef LORA_MANAGER_H
 #define LORA_MANAGER_H
 
+#include "GameProtocol.h"
 #include <Arduino.h>
 #include <Preferences.h>
 #include <RadioLib.h>
 #include <SPI.h>
 
-/**
- * Klasa LoRaManager
- * Zarządza komunikacją LoRaWAN w Klasie A przy użyciu biblioteki RadioLib.
- * Zoptymalizowana pod kątem pracy w środowisku FreeRTOS.
- */
 class LoRaManager {
 private:
   // --- Obiekty RadioLib (Kolejność ma znaczenie dla inicjalizacji) ---
   Module _mod;       // Moduł sprzętowy (piny)
   SX1262 _radio;     // Sterownik układu radiowego
   LoRaWANNode _node; // Stos protokołu LoRaWAN
+
+  GameState *_state;
 
   // --- Zarządzanie sesją i stanem ---
   Preferences prefs;          // Pamięć nieulotna ESP32 (NVS)
@@ -47,20 +45,8 @@ public:
    * Inicjalizuje szynę SPI, radio SX1262 oraz stos LoRaWAN.
    * Przywraca sesję z Flash, jeśli istnieje.
    */
-  void begin();
+  void begin(GameState *statePtr);
 
-  /**
-   * Wysyła pakiet danych i nasłuchuje odpowiedzi (Downlink) w oknach RX1/RX2.
-   * @param payload Wskaźnik na dane do wysłania
-   * @param length Długość danych
-   * @param confirmed Czy wymaga potwierdzenia od serwera (ACK)
-   * @param rxBuffer Bufor, do którego zostaną zapisane dane odebrane
-   * (opcjonalnie)
-   * @param rxLen Wskaźnik na zmienną, która otrzyma informację o ilości
-   * odebranych bajtów (opcjonalnie)
-   * @return true jeśli wysyłka zakończyła się sukcesem (niezależnie od tego czy
-   * odebrano downlink)
-   */
   bool sendPacket(uint8_t *payload, size_t length, bool confirmed,
                   uint8_t *rxBuffer = nullptr, size_t *rxLen = nullptr);
 
@@ -74,12 +60,6 @@ public:
    * Zwraca aktualny status połączenia.
    */
   bool isConnected() const { return isJoined; }
-
-  /**
-   * Metoda zachowana dla kompatybilności wstecznej.
-   * W Klasie A downlinki obsługiwane są bezpośrednio w sendPacket.
-   */
-  void receiveDownlink();
 };
 
 #endif // LORA_MANAGER_H

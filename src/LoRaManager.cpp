@@ -8,8 +8,9 @@ LoRaManager::LoRaManager(uint64_t joinEui, uint64_t devEui, uint8_t *appKey)
       _radio(&_mod), _node(&_radio, &EU868), _joinEui(joinEui), _devEui(devEui),
       _appKey(appKey) {}
 
-void LoRaManager::begin() {
+void LoRaManager::begin(GameState *statePtr) {
   // 1. Konfiguracja szyny SPI dla T-Beam
+  _state = statePtr;
   SPI.begin(5, 19, 27);
 
   Serial.print(F("[LoRa] Inicjalizacja SX1262... "));
@@ -60,10 +61,15 @@ void LoRaManager::maintainConnection() {
     if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NEW_SESSION) {
       Serial.println(F("POŁĄCZONO!"));
       isJoined = true;
+      // Sygnał dla reszty systemu
+      _state->loraConnected = true;
+
       saveSession(); // Zapisujemy nową sesję natychmiast
     } else {
       Serial.printf("BŁĄD (%d)\n", state);
       // Delay przed kolejną próbą obsługiwany jest przez Task RTOS
+      Serial.println(F("[LoRa] Próba ponownego połączenia za chwilę..."));
+      _state->loraConnected = false;
     }
   }
 }
@@ -73,12 +79,9 @@ bool LoRaManager::sendPacket(uint8_t *payload, size_t length, bool confirmed,
   if (!isJoined)
     return false;
 
-  LoRaWANEvent_t dlEvent;
+  LoRaWANEvent_t dlEvent; // Struktura do przechwycenia informacji o downlinku
+                          // (np. fPort, RSSI, multicast)
 
-  // Kluczowa funkcja RadioLib dla Klasy A:
-  // 1. Wysyła dane (Uplink)
-  // 2. Otwiera okno RX1 (po 1s) i RX2 (po 2s)
-  // 3. Jeśli serwer coś wysłał, zapisuje to w rxBuffer i ustawia rxLen
   int txState =
       _node.sendReceive(payload, length,
                         1,         // fPort (domyślnie 1)
@@ -111,7 +114,7 @@ void LoRaManager::saveSession() {
   uint32_t currentFCnt = _node.getFCntUp();
 
   // Zapisuj do Flash tylko co 10 wysłanych pakietów, aby chronić pamięć
-  if (currentFCnt == 0 || (currentFCnt - lastSavedFCnt) >= 10) {
+  if (currentFCnt == 0 || (currentFCnt - lastSavedFCnt) >= 20) {
     prefs.begin("lorawan", false);
     size_t written = prefs.putBytes("session", _node.getBufferSession(), 256);
     prefs.end();
@@ -123,9 +126,4 @@ void LoRaManager::saveSession() {
       Serial.println(F("[NVS] BŁĄD zapisu sesji!"));
     }
   }
-}
-
-void LoRaManager::receiveDownlink() {
-  // W Klasie A downlinki przychodzą tylko w odpowiedzi na uplink,
-  // więc ta metoda nie musi nic robić asynchronicznie.
 }

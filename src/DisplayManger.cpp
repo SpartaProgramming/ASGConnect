@@ -7,7 +7,7 @@ void DisplayManager::begin() {
   pinMode(TFT_BLK, OUTPUT);
   digitalWrite(TFT_BLK, HIGH);
 
-  tft.init(170, 320); // Rozdzielczość ekranu (zależnie od Twojego modelu)
+  tft.init(170, 320); // Rozdzielczość ekranu
   tft.setRotation(3); // Orientacja pozioma
   tft.fillScreen(ST77XX_BLACK);
 }
@@ -24,10 +24,39 @@ void DisplayManager::showBootScreen() {
   tft.print("Inicjalizacja...");
 }
 
+void DisplayManager::updateTime(uint16_t totalSeconds) {
+  uint16_t mins = totalSeconds / 60;
+  uint16_t secs = totalSeconds % 60;
+
+  tft.setCursor(210, 35);
+  tft.setTextSize(3);
+
+  tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+
+  tft.printf("%02d:%02d", mins, secs);
+}
+
+void DisplayManager::updateGPS(double lat, double lon, GamePhase phase) {
+  if (phase != PHASE_RUNNING && phase != PHASE_READY)
+    return;
+
+  tft.setTextSize(1);
+  tft.setCursor(10, 155);
+
+  if (lat != 0.0 && lon != 0.0) {
+    // Nadpisujemy stary tekst z czarnym tłem
+    tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    tft.printf("LAT: %.5f  LON: %.5f", lat, lon);
+  } else {
+    // Zabezpieczenie wizualne – jeśli zgubi fixa
+    tft.setTextColor(ST77XX_RED, ST77XX_BLACK);
+    tft.print("SZUKAM SYGNALU GPS...       ");
+  }
+}
+
 void DisplayManager::updateGameUI(const GameState &state) {
   tft.fillScreen(ST77XX_BLACK);
 
-  // --- 1. GÓRNY PASEK: Nick, Zasięg, Bateria ---
   tft.setTextSize(2);
   tft.setCursor(5, 5);
 
@@ -62,17 +91,12 @@ void DisplayManager::updateGameUI(const GameState &state) {
     tft.setTextColor(ST77XX_CYAN);
     tft.print("CZEKAJ NA START");
   } else if (state.phase == PHASE_RUNNING) {
-    // A. ZEGAR (prawa strona)
-    tft.setCursor(240, 35);
-    tft.setTextSize(2);
-    tft.setTextColor(ST77XX_WHITE);
-    int min = state.timeLeftSeconds / 60;
-    int sec = state.timeLeftSeconds % 60;
-    tft.printf("%02d:%02d", min, sec);
+
+    updateTime(state.timeLeftSeconds);
 
     // B. STATUS GRACZA (Środek)
-    tft.setCursor(80, 60);
-    tft.setTextSize(5);
+    tft.setCursor(45, 60);
+    tft.setTextSize(4);
     if (state.playerStatus == PLAYER_ALIVE) {
       tft.setTextColor(ST77XX_GREEN);
       tft.print("ALIVE");
@@ -107,20 +131,7 @@ void DisplayManager::updateGameUI(const GameState &state) {
     tft.print(state.endMessage);
   }
 
-  // --- 3. DOLNY PASEK GPS ---
-  // Rysujemy tylko w trakcie gry lub gotowości, gdy zaczynamy łapać fixa
-  if (state.phase == PHASE_RUNNING || state.phase == PHASE_READY) {
-    tft.fillRect(0, 150, 320, 20,
-                 ST77XX_BLACK); // Czyszczenie tła dla samego GPS
-    tft.setTextSize(1);
-    tft.setCursor(10, 155);
-
-    if (state.lat != 0.0 && state.lon != 0.0) {
-      tft.setTextColor(ST77XX_WHITE);
-      tft.printf("LAT: %.5f  LON: %.5f", state.lat, state.lon);
-    } else {
-      tft.setTextColor(ST77XX_RED);
-      tft.print("SZUKAM SYGNALU GPS...");
-    }
-  }
+  updateGPS(state.lat, state.lon,
+            state.phase); // Aktualizujemy GPS przy każdej zmianie UI, aby od
+                          // razu pokazać lokalizację
 }
