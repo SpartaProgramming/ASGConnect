@@ -37,9 +37,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 2.2,
-          "height": 3.8,
-          "width": 3.8
+          "drill": 0.8,
+          "height": 1.27,
+          "width": 2.54
         },
         "silk_line_width": 0.1,
         "silk_text_italic": false,
@@ -48,7 +48,7 @@
         "silk_text_thickness": 0.1,
         "silk_text_upright": false,
         "zones": {
-          "min_clearance": 0.1
+          "min_clearance": 0.5
         }
       },
       "diff_pair_dimensions": [
@@ -58,64 +58,7 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [
-        [
-          "clearance|66210000|110995000|c8342f8b-2a3f-4a00-824b-17c74a4fd19f|e5e8523a-a5f8-476d-a753-05b2e3e669f8",
-          ""
-        ],
-        [
-          "clearance|66390000|112465000|9e25d216-2202-4ba3-b97f-b73823d4d3ae|710f8512-c93e-4ff0-9741-3deac8b92dbc",
-          ""
-        ],
-        [
-          "clearance|66710000|110995000|e5e8523a-a5f8-476d-a753-05b2e3e669f8|a20a023e-9bac-4ee2-9955-22ed6e9b8dde",
-          ""
-        ],
-        [
-          "clearance|67210000|110995000|a20a023e-9bac-4ee2-9955-22ed6e9b8dde|5aff68fa-cc38-4a1d-99f3-cbf616341574",
-          ""
-        ],
-        [
-          "clearance|67390000|112465000|86087972-3e95-4efc-a48c-9d0c60ade57d|8fc69a8f-d561-4c62-9c7d-6bd348f7e189",
-          ""
-        ],
-        [
-          "clearance|90319501|87768599|91963346-bb6a-41c9-9353-d23fcfe6ce0e|2f578355-df51-457f-8e98-06a375c348e0",
-          ""
-        ],
-        [
-          "clearance|91419499|87768599|2f578355-df51-457f-8e98-06a375c348e0|be3f6fab-f2a7-4bb4-98bf-e7bb01f2e204",
-          ""
-        ],
-        [
-          "lib_footprint_mismatch|79980000|93210000|efa872b9-2f17-4124-9da2-26e4751d9a27|00000000-0000-0000-0000-000000000000",
-          ""
-        ],
-        [
-          "lib_footprint_mismatch|80750000|57850000|d6232070-8e9d-430c-abc1-67960f7b48e0|00000000-0000-0000-0000-000000000000",
-          ""
-        ],
-        [
-          "lib_footprint_mismatch|91300000|130367500|f062f7c1-e81b-4652-bf4f-5e24fba27363|00000000-0000-0000-0000-000000000000",
-          ""
-        ],
-        [
-          "silk_edge_clearance|75300000|140000000|03743b78-a526-4bcd-8193-e9330366293c|168be1f2-598d-4d0f-9439-eb4604c8d478",
-          ""
-        ],
-        [
-          "silk_edge_clearance|84700000|140000000|03743b78-a526-4bcd-8193-e9330366293c|69c2f0c5-6468-4c37-8381-f3e4791ad03e",
-          ""
-        ],
-        [
-          "unconnected_items|55450000|127750000|F.Cu|4|7d4fcfaf-ae22-46de-a109-464d2b7765fa|7ca04e04-f505-4e18-b7d3-1c5408b2d53f",
-          ""
-        ],
-        [
-          "unconnected_items|98300000|124500000|F.Cu|4|859096c0-b3b4-418f-9097-d4993b71a1b0|360fec5a-a662-4b36-a76b-b6e04b233d62",
-          ""
-        ]
-      ],
+      "drc_exclusions": [],
       "meta": {
         "version": 2
       },
@@ -196,7 +139,7 @@
         "min_track_width": 0.1,
         "min_via_annular_width": 0.1,
         "min_via_diameter": 0.5,
-        "solder_mask_to_copper_clearance": 0.005,
+        "solder_mask_to_copper_clearance": 0.0,
         "use_height_for_length_calcs": true
       },
       "teardrop_options": [
@@ -247,11 +190,8 @@
         0.0,
         0.2,
         0.25,
-        0.4,
         0.5,
-        0.7,
-        0.8,
-        1.0
+        0.8
       ],
       "tuning_pattern_settings": {
         "diff_pair_defaults": {
@@ -567,7 +507,7 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 3,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.1565,
+        "track_width": 0.15,
         "via_diameter": 0.6,
         "via_drill": 0.3
       },
@@ -584,12 +524,12 @@
       {
         "clearance": 0.2,
         "diff_pair_gap": 0.2,
-        "diff_pair_width": 0.1582,
+        "diff_pair_width": 0.15,
         "name": "USB_90",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 2,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.1582,
+        "track_width": 0.15,
         "via_diameter": 0.6,
         "via_drill": 0.3
       }
@@ -695,42 +635,6 @@
       {
         "netclass": "Signal",
         "pattern": "SDA"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "W_MOSI"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "W_SCK"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "W_CS"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "W_BL"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "W_RST"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "W_DC"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "TX0"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "RX0"
-      },
-      {
-        "netclass": "Signal",
-        "pattern": "BTN3"
       }
     ]
   },
@@ -739,7 +643,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "Gerber_test/",
+      "plot": "",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",
@@ -787,7 +691,7 @@
           "group_by": true,
           "label": "DNP",
           "name": "${DNP}",
-          "show": false
+          "show": true
         },
         {
           "group_by": true,
@@ -799,7 +703,7 @@
           "group_by": true,
           "label": "Exclude from Board",
           "name": "${EXCLUDE_FROM_BOARD}",
-          "show": false
+          "show": true
         },
         {
           "group_by": true,
@@ -811,253 +715,13 @@
           "group_by": false,
           "label": "Datasheet",
           "name": "Datasheet",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "ANTENNA TYPE",
-          "name": "ANTENNA TYPE",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Availability",
-          "name": "Availability",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "COMMUNICATION DISTANCE",
-          "name": "COMMUNICATION DISTANCE",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "CONVERT TO PCB",
-          "name": "CONVERT TO PCB",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Check_prices",
-          "name": "Check_prices",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "DATASHEET",
-          "name": "DATASHEET",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "DEVICE",
-          "name": "DEVICE",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Description_1",
-          "name": "Description_1",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "INTERFACE TYPE",
-          "name": "INTERFACE TYPE",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "JLCPCB PART CLASS",
-          "name": "JLCPCB PART CLASS",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "LCSC PART NAME",
-          "name": "LCSC PART NAME",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "MANUFACTURER",
-          "name": "MANUFACTURER",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "MANUFACTURER PART",
-          "name": "MANUFACTURER PART",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "MAXIMUM_PACKAGE_HEIGHT",
-          "name": "MAXIMUM_PACKAGE_HEIGHT",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "MF",
-          "name": "MF",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "MODULATION SYSTEM",
-          "name": "MODULATION SYSTEM",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "MP",
-          "name": "MP",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "OUTPUT POWER",
-          "name": "OUTPUT POWER",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "PARTREV",
-          "name": "PARTREV",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Package",
-          "name": "Package",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Price",
-          "name": "Price",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Purchase-URL",
-          "name": "Purchase-URL",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "RECEIVE  CURRENT",
-          "name": "RECEIVE  CURRENT",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "SEND  CURRENT",
-          "name": "SEND  CURRENT",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "SENSITIVITY",
-          "name": "SENSITIVITY",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "SNAPEDA_PACKAGE_ID",
-          "name": "SNAPEDA_PACKAGE_ID",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "STANDARD",
-          "name": "STANDARD",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "SUPPLIER",
-          "name": "SUPPLIER",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "SUPPLIER FOOTPRINT",
-          "name": "SUPPLIER FOOTPRINT",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "SUPPLIER PART",
-          "name": "SUPPLIER PART",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "SYMBOL",
-          "name": "SYMBOL",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Sim.Device",
-          "name": "Sim.Device",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Sim.Pins",
-          "name": "Sim.Pins",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Sim.Type",
-          "name": "Sim.Type",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "SnapEDA_Link",
-          "name": "SnapEDA_Link",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "VOLTAGE - SUPPLY",
-          "name": "VOLTAGE - SUPPLY",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "ADD INTO BOM",
-          "name": "ADD INTO BOM",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Description",
-          "name": "Description",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "#",
-          "name": "${ITEM_NUMBER}",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "LCSC",
-          "name": "LCSC",
           "show": true
         }
       ],
       "filter_string": "",
       "group_symbols": true,
       "include_excluded_from_bom": true,
-      "name": "",
+      "name": "Default Editing",
       "sort_asc": true,
       "sort_field": "Reference"
     },
