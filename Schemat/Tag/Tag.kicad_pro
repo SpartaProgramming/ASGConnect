@@ -484,6 +484,10 @@
           ""
         ],
         [
+          "solder_mask_bridge|95475000|60625000|60e9e0cd-5077-475b-adfc-c2160c05b05b|3a0a7c86-f114-4d59-820a-764ce7954ad6",
+          ""
+        ],
+        [
           "solder_mask_bridge|95550000|60800000|2dc37af4-7706-40d4-8614-8af00bc40b52|792ec66c-d87c-4b28-84cd-3bab6d738f0b",
           ""
         ],
@@ -492,15 +496,7 @@
           ""
         ],
         [
-          "solder_mask_bridge|96725000|60625000|60e9e0cd-5077-475b-adfc-c2160c05b05b|792ec66c-d87c-4b28-84cd-3bab6d738f0b",
-          ""
-        ],
-        [
           "solder_mask_bridge|97550000|75800000|f4d3c822-ac2b-4ef5-972d-8c91c79a9766|fdfd4f56-daa1-4a1f-b966-52eb6099beb6",
-          ""
-        ],
-        [
-          "solder_mask_bridge|98075000|98075000|18edc239-f6ac-49c0-b1ec-0c2a5c21900f|4e86a655-2203-4f2b-810d-51a105344688",
           ""
         ],
         [
@@ -544,11 +540,15 @@
           ""
         ],
         [
+          "solder_mask_bridge|99325000|98075000|18edc239-f6ac-49c0-b1ec-0c2a5c21900f|47402ad6-f77a-4003-ad87-df9c417a6e16",
+          ""
+        ],
+        [
           "unconnected_items|55450000|127750000|F.Cu|4|7d4fcfaf-ae22-46de-a109-464d2b7765fa|7ca04e04-f505-4e18-b7d3-1c5408b2d53f",
           ""
         ],
         [
-          "unconnected_items|98300000|124500000|F.Cu|4|db710d3b-796c-4244-b6c3-e6afc0069c5f|360fec5a-a662-4b36-a76b-b6e04b233d62",
+          "unconnected_items|98300000|124500000|F.Cu|4|859096c0-b3b4-418f-9097-d4993b71a1b0|360fec5a-a662-4b36-a76b-b6e04b233d62",
           ""
         ]
       ],
@@ -1178,7 +1178,7 @@
       "plot": "Gerber_test/",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "Tag.step",
       "svg": "",
       "vrml": ""
     },
